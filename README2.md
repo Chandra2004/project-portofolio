@@ -217,3 +217,226 @@ Router::add('GET', '/users/delete/([0-9a-zA-Z-]+)', UserController::class, 'dest
 ---
 
 Mau saya bikinkan **versi AJAX (tanpa reload halaman)** untuk tabel ini biar terasa modern seperti DataTables?
+
+
+
+=======================================================================================================
+
+
+Oke 👍 kita ubah query mentah itu jadi **ORM chaining** dengan `QueryBuilder` kamu.
+Aku pakai **Model** supaya rapi, tapi query langsung pakai `query()` dari model.
+
+---
+
+## 📌 Model contoh
+
+`app/Models/UserModel.php`
+
+```php
+<?php
+namespace App\Models;
+
+use TheFramework\App\Model;
+
+class UserModel extends Model
+{
+    protected $table = 'users';
+    protected $primaryKey = 'id';
+}
+```
+
+`app/Models/RoleModel.php`
+
+```php
+<?php
+namespace App\Models;
+
+use TheFramework\App\Model;
+
+class RoleModel extends Model
+{
+    protected $table = 'roles';
+    protected $primaryKey = 'id';
+}
+```
+
+`app/Models/CourseModel.php`
+
+```php
+<?php
+namespace App\Models;
+
+use TheFramework\App\Model;
+
+class CourseModel extends Model
+{
+    protected $table = 'courses';
+    protected $primaryKey = 'id';
+}
+```
+
+`app/Models/UserCourseModel.php`
+
+```php
+<?php
+namespace App\Models;
+
+use TheFramework\App\Model;
+
+class UserCourseModel extends Model
+{
+    protected $table = 'usercourse';
+    protected $primaryKey = 'id';
+}
+```
+
+---
+
+## 📌 Query ORM
+
+### 1️⃣ Users + Roles
+
+```php
+$users = (new \App\Models\UserModel())
+    ->query()
+    ->select([
+        'u.id AS user_id',
+        'u.uid AS user_uid',
+        'u.email',
+        'r.name AS role_name',
+        'r.description AS role_desc'
+    ])
+    ->table('users u')
+    ->join('roles r', 'u.role_uid', '=', 'r.uid')
+    ->get();
+```
+
+---
+
+### 2️⃣ Users + Courses via UserCourse
+
+```php
+$userCourses = (new \App\Models\UserCourseModel())
+    ->query()
+    ->select([
+        'u.id AS user_id',
+        'u.email',
+        'c.name_course',
+        'c.deadline_course',
+        'c.kuota_course'
+    ])
+    ->table('usercourse uc')
+    ->join('users u', 'uc.user_uid', '=', 'u.uid')
+    ->join('courses c', 'uc.course_uid', '=', 'c.uid')
+    ->get();
+```
+
+---
+
+### 3️⃣ Courses + Users + Roles
+
+```php
+$courses = (new \App\Models\UserCourseModel())
+    ->query()
+    ->select([
+        'c.id AS course_id',
+        'c.name_course',
+        'u.email AS user_email',
+        'r.name AS user_role'
+    ])
+    ->table('usercourse uc')
+    ->join('courses c', 'uc.course_uid', '=', 'c.uid')
+    ->join('users u', 'uc.user_uid', '=', 'u.uid')
+    ->join('roles r', 'u.role_uid', '=', 'r.uid')
+    ->orderBy('c.name_course', 'ASC')
+    ->get();
+```
+
+---
+
+## 📌 Pemakaian di Controller
+
+```php
+$controller = new \App\Controllers\DemoController();
+
+// Users + Roles
+print_r($controller->usersWithRoles());
+
+// Users + Courses
+print_r($controller->usersWithCourses());
+
+// Courses + Users + Roles
+print_r($controller->coursesWithUsersAndRoles());
+```
+
+---
+
+## 📌 DemoController
+
+```php
+<?php
+namespace App\Controllers;
+
+use App\Models\UserModel;
+use App\Models\UserCourseModel;
+
+class DemoController
+{
+    public function usersWithRoles()
+    {
+        return (new UserModel())
+            ->query()
+            ->select([
+                'u.id AS user_id',
+                'u.uid AS user_uid',
+                'u.email',
+                'r.name AS role_name',
+                'r.description AS role_desc'
+            ])
+            ->table('users u')
+            ->join('roles r', 'u.role_uid', '=', 'r.uid')
+            ->get();
+    }
+
+    public function usersWithCourses()
+    {
+        return (new UserCourseModel())
+            ->query()
+            ->select([
+                'u.id AS user_id',
+                'u.email',
+                'c.name_course',
+                'c.deadline_course',
+                'c.kuota_course'
+            ])
+            ->table('usercourse uc')
+            ->join('users u', 'uc.user_uid', '=', 'u.uid')
+            ->join('courses c', 'uc.course_uid', '=', 'c.uid')
+            ->get();
+    }
+
+    public function coursesWithUsersAndRoles()
+    {
+        return (new UserCourseModel())
+            ->query()
+            ->select([
+                'c.id AS course_id',
+                'c.name_course',
+                'u.email AS user_email',
+                'r.name AS user_role'
+            ])
+            ->table('usercourse uc')
+            ->join('courses c', 'uc.course_uid', '=', 'c.uid')
+            ->join('users u', 'uc.user_uid', '=', 'u.uid')
+            ->join('roles r', 'u.role_uid', '=', 'r.uid')
+            ->orderBy('c.name_course', 'ASC')
+            ->get();
+    }
+}
+```
+
+---
+
+⚡ Jadi semua query mentah sudah bisa kamu tulis **ORM chaining-style** dengan `->query()->join()->get()`.
+
+Mau aku bikinkan **helper relationship (hasMany, belongsTo, belongsToMany)** di ORM kamu, supaya query di atas jadi lebih mirip **Eloquent** (cukup `$user->role` atau `$course->users`)?
